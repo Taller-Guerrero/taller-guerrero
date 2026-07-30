@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taller Guerrero | Operaciones y Ventas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SDK de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes scaleUp {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-scale-up {
+            animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            background: linear-gradient(-45deg, #e2e8f0, #f8fafc, #dbeafe, #f1f5f9);
+            background-size: 400% 400%;
+            animation: gradientMove 15s ease infinite;
+            color: #334155; 
+        }
+
+        .table-spaced { border-collapse: separate; border-spacing: 0 0.75rem; }
+        .table-spaced th { border-bottom: none; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <!-- Navegación Flotante Estilo Cristal -->
+    <header class="sticky top-4 z-40 px-6">
+        <div class="max-w-6xl mx-auto glass-panel rounded-3xl p-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4 px-3">
+                <div class="h-12 w-12 rounded-2xl bg-blue-100/80 flex items-center justify-center text-blue-600 text-2xl border border-blue-200/50 shadow-sm">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Taller Guerrero</h1>
+                    <span class="text-xs font-bold text-blue-500 tracking-widest uppercase">Sistema Integrado</span>
+                </div>
+            </div>
+
+            <!-- Controles de Secciones (Tabs) -->
+            <div class="flex items-center bg-white/40 p-1.5 rounded-2xl border border-white/60">
+                <button type="button" onclick="switchTab('taller')" id="btn-taller" class="relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 bg-blue-500 text-white shadow-md shadow-blue-500/20">
+                    🔧 Taller y Órdenes
+                </button>
+                <button type="button" onclick="switchTab('ventas')" id="btn-ventas" class="relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 text-slate-500 hover:text-slate-800 hover:bg-white/50">
+                    💰 Ventas de Carros
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 mt-8">
+
+        <!-- ================= SECCIÓN: TALLER Y ÓRDENES ================= -->
+        <section id="view-taller" class="space-y-8">
+            <div class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-4xl font-black text-slate-800 tracking-tight">Zona de Trabajo</h2>
+                    <p class="text-slate-500 mt-1 font-medium">Gestión de reparaciones, refacciones y clientes en proceso.</p>
+                </div>
+                <button type="button" onclick="openAddTaller()" class="glass-panel hover:bg-white/90 text-blue-600 font-bold px-5 py-3 rounded-2xl text-sm transition-all duration-300 flex items-center gap-2 group shadow-sm">
+                    <span class="text-lg group-hover:rotate-90 transition-transform">+</span> Nueva Orden
+                </button>
+            </div>
+
+            <!-- KPIs de Taller -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest">En Proceso / Taller</span>
+                    <div id="metric-taller-count" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Órdenes activas</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Espera Refacciones</span>
+                    <div id="metric-taller-espera" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Pendientes de piezas</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Terminados / Listos</span>
+                    <div id="metric-taller-terminados" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Para entrega</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Facturación Taller</span>
+                    <div id="metric-taller-ingresos" class="text-3xl font-black text-blue-600 mt-1">$0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Acumulado en reparaciones</span>
+                </div>
+            </div>
+
+            <table class="w-full text-left table-spaced">
+                <thead>
+                    <tr class="text-slate-500 text-xs uppercase tracking-widest">
+                        <th class="px-6 pb-2">Orden / Cliente</th>
+                        <th class="px-6 pb-2">Vehículo</th>
+                        <th class="px-6 pb-2">Estatus</th>
+                        <th class="px-6 pb-2">Cuenta Total</th>
+                        <th class="px-6 pb-2 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-taller-body" class="text-sm"></tbody>
+            </table>
+        </section>
+
+
+        <!-- ================= SECCIÓN: VENTAS DE CARROS ================= -->
+        <section id="view-ventas" class="space-y-8 hidden">
+            <div class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-4xl font-black text-slate-800 tracking-tight">Ventas y Finanzas</h2>
+                    <p class="text-slate-500 mt-1 font-medium">Inventario, control de reacondicionamiento y utilidades netas.</p>
+                </div>
+                <button type="button" onclick="openAddVenta()" class="glass-panel hover:bg-white/90 text-teal-600 font-bold px-5 py-3 rounded-2xl text-sm transition-all duration-300 flex items-center gap-2 group shadow-sm">
+                    <span class="text-lg group-hover:rotate-90 transition-transform">+</span> Registrar Vehículo
+                </button>
+            </div>
+
+            <!-- KPIs de Ventas y Finanzas -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-teal-600 uppercase tracking-widest">Carros Activos</span>
+                    <div id="kpi-carros-activos" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">En stock / proceso</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-teal-600 uppercase tracking-widest">Inversión Activa</span>
+                    <div id="kpi-inversion-activa" class="text-3xl font-black text-slate-800 mt-1">$0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Capital en lote</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-teal-600 uppercase tracking-widest">Gastos Reaco.</span>
+                    <div id="kpi-gastos-activos" class="text-3xl font-black text-slate-800 mt-1">$0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Refacciones y extras</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Ventas Exitosas</span>
+                    <div id="kpi-ventas-exitosas" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Unidades vendidas</span>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 relative overflow-hidden">
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Ganancias Netas</span>
+                    <div id="kpi-ganancias-netas" class="text-3xl font-black text-emerald-600 mt-1">$0</div>
+                    <span class="text-[11px] text-slate-400 font-medium">Utilidad real acumulada</span>
+                </div>
+            </div>
+
+            <table class="w-full text-left table-spaced">
+                <thead>
+                    <tr class="text-slate-500 text-xs uppercase tracking-widest">
+                        <th class="px-6 pb-2">ID Registro</th>
+                        <th class="px-6 pb-2">Vehículo / Modelo</th>
+                        <th class="px-6 pb-2">Inversión / Precio</th>
+                        <th class="px-6 pb-2">Estatus</th>
+                        <th class="px-6 pb-2">Fecha de Creación</th>
+                        <th class="px-6 pb-2 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-ventas-body" class="text-sm"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- ================= MODAL 1: AGREGAR ORDEN (TALLER) ================= -->
+    <div id="modal-add-taller" class="fixed inset-0 bg-slate-800/30 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-panel !bg-white/90 rounded-[2rem] max-w-2xl w-full shadow-2xl flex flex-col transform scale-95 transition-transform duration-300" id="content-add-taller">
+            <div class="px-8 py-6 border-b border-slate-200/60 flex justify-between items-center bg-white/50">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl border border-blue-100">➕</div>
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800 tracking-tight leading-none">Ingresar Auto al Taller</h3>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Nueva Orden de Trabajo</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('modal-add-taller', 'content-add-taller')" class="h-10 w-10 rounded-2xl bg-slate-100/80 border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white hover:rotate-90 transition-all flex items-center justify-center font-black shadow-sm">✕</button>
+            </div>
+            <form onsubmit="guardarOrdenTaller(event)" class="p-8 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Nombre del Cliente</label>
+                        <input type="text" id="input-cliente-taller" required placeholder="Ej. Juan Pérez" class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Vehículo y Año</label>
+                        <input type="text" id="input-vehiculo-taller" required placeholder="Ej. Honda Civic 2019" class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Estatus Inicial</label>
+                        <select id="input-estatus-taller" class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Esperando Refacciones">Esperando Refacciones</option>
+                            <option value="En Reparación" selected>En Reparación</option>
+                            <option value="Terminado">Terminado</option>
+                            <option value="Entregado">Entregado</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Falla Reportada o Servicio</label>
+                        <input type="text" id="input-falla-taller" required placeholder="Describe brevemente..." class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                </div>
+                <div class="flex justify-end pt-4 border-t border-slate-200/60">
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md shadow-blue-500/20 transition-colors">
+                        Crear Orden de Trabajo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL 2: AGREGAR AUTO PARA VENTA ================= -->
+    <div id="modal-add-venta" class="fixed inset-0 bg-slate-800/30 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-panel !bg-white/90 rounded-[2rem] max-w-2xl w-full shadow-2xl flex flex-col transform scale-95 transition-transform duration-300" id="content-add-venta">
+            <div class="px-8 py-6 border-b border-slate-200/60 flex justify-between items-center bg-white/50">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl border border-teal-100">🚘</div>
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800 tracking-tight leading-none">Registrar Vehículo en Inventario</h3>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Nueva Inversión de Venta</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('modal-add-venta', 'content-add-venta')" class="h-10 w-10 rounded-2xl bg-slate-100/80 border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white hover:rotate-90 transition-all flex items-center justify-center font-black shadow-sm">✕</button>
+            </div>
+            <form onsubmit="guardarAutoVenta(event)" class="p-8 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Modelo y Año</label>
+                        <input type="text" id="input-vehiculo-venta" required placeholder="Ej. VW Jetta 2015" class="w-full bg-white/80 border border-slate-200 focus:border-teal-400 focus:ring-4 focus:ring-teal-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Costo de Inversión Inicial</label>
+                        <input type="number" step="any" id="input-inversion-venta" required placeholder="$ 0.00" class="w-full bg-white/80 border border-slate-200 focus:border-teal-400 focus:ring-4 focus:ring-teal-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Precio de Venta</label>
+                        <input type="number" step="any" id="input-precio-venta" required placeholder="$ 0.00" class="w-full bg-white/80 border border-slate-200 focus:border-teal-400 focus:ring-4 focus:ring-teal-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Estatus</label>
+                        <select id="input-estatus-venta" class="w-full bg-white/80 border border-slate-200 focus:border-teal-400 focus:ring-4 focus:ring-teal-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                            <option value="Disponible">Disponible</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Vendido">Vendido</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end pt-4 border-t border-slate-200/60 mt-4">
+                    <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md shadow-teal-500/20 transition-colors">
+                        Agregar a Inventario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL 3: FICHA DE DETALLES, GASTOS Y ELIMINAR ================= -->
+    <div id="modal-edit" class="fixed inset-0 bg-slate-800/30 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-panel !bg-white/90 rounded-[2rem] max-w-3xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform scale-95 transition-transform duration-300" id="content-edit">
+            
+            <div class="px-8 py-6 border-b border-slate-200/60 flex justify-between items-center bg-white/50">
+                <div class="flex items-center gap-3">
+                    <div id="modal-icon" class="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl border border-indigo-100">📋</div>
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800 tracking-tight leading-none">Ficha Técnica y Detalles</h3>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Control de Operaciones y Edición</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('modal-edit', 'content-edit')" class="h-10 w-10 rounded-2xl bg-slate-100/80 border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-white hover:rotate-90 transition-all flex items-center justify-center font-black shadow-sm">✕</button>
+            </div>
+
+            <div class="p-8 overflow-y-auto space-y-6 flex-1 custom-scrollbar bg-white/30">
+                <!-- Datos Principales -->
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-400"></span> Datos Principales
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Vehículo / Modelo</label>
+                            <input type="text" id="edit-vehiculo" class="w-full bg-white/80 border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                        </div>
+                        <div class="space-y-1" id="container-edit-cliente">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Cliente / Comprador</label>
+                            <input type="text" id="edit-cliente" class="w-full bg-white/80 border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                        </div>
+                        <div class="space-y-1" id="container-edit-inversion">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Costo de Inversión Inicial</label>
+                            <input type="number" step="any" id="edit-inversion" class="w-full bg-white/80 border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                        </div>
+                        <div class="space-y-1" id="container-edit-estatus">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Estatus</label>
+                            <select id="edit-estatus" class="w-full bg-white/80 border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                                <option value="Disponible">Disponible</option>
+                                <option value="En Proceso">En Proceso</option>
+                                <option value="Vendido">Vendido</option>
+                            </select>
+                        </div>
+                        <!-- Estatus específico para Taller -->
+                        <div class="space-y-1 md:col-span-2 hidden" id="container-edit-estatus-taller">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Estatus de Reparación</label>
+                            <select id="edit-estatus-taller" class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm">
+                                <option value="En Revisión">En Revisión</option>
+                                <option value="Esperando Refacciones">Esperando Refacciones</option>
+                                <option value="En Reparación">En Reparación</option>
+                                <option value="Terminado">Terminado</option>
+                                <option value="Entregado">Entregado</option>
+                            </select>
+                        </div>
+                        <!-- Falla reportada para Taller -->
+                        <div class="space-y-1 md:col-span-2 hidden" id="container-edit-falla">
+                            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Falla Reportada o Servicio</label>
+                            <textarea id="edit-falla" rows="2" class="w-full bg-white/80 border border-slate-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-medium outline-none transition-all shadow-sm resize-none"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="actualizarRegistro()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md shadow-indigo-500/20 transition-colors">
+                        Actualizar Información
+                    </button>
+                </div>
+
+                <!-- SECCIÓN DE GASTOS EXTRA (Ventas) -->
+                <div id="section-gastos-container" class="pt-6 border-t border-slate-200/60 hidden space-y-4">
+                    <h4 class="text-xs font-black uppercase tracking-widest text-teal-600 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-teal-400"></span> Gastos Adicionales (Refacciones, Placas, etc.)
+                    </h4>
+                    
+                    <form onsubmit="agregarGasto(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white/60 p-4 rounded-2xl border border-teal-100">
+                        <div>
+                            <select id="gasto-category" required class="w-full bg-white border border-slate-200 focus:border-teal-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                                <option value="" disabled selected>Categoría...</option>
+                                <option value="Refacciones">Refacciones</option>
+                                <option value="Placas y Trámites">Placas y Trámites</option>
+                                <option value="Mantenimiento / Mecánico">Mantenimiento / Mecánico</option>
+                                <option value="Pintura y Estética">Pintura y Estética</option>
+                                <option value="Combustible">Combustible</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <input type="text" id="gasto-descripcion" required placeholder="Descripción del artículo..." class="w-full bg-white border border-slate-200 focus:border-teal-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                        </div>
+                        <div>
+                            <input type="number" step="any" id="gasto-monto" required placeholder="Monto ($)" class="w-full bg-white border border-slate-200 focus:border-teal-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                        </div>
+                        <div>
+                            <button type="submit" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition-colors shadow-sm">
+                                + Agregar
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="bg-white/40 rounded-2xl p-4 border border-slate-200/60 space-y-2">
+                        <div id="lista-gastos-vehiculo" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                            <p class="text-xs text-slate-400 text-center py-2">Cargando gastos...</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-200 flex justify-between items-center text-xs font-bold text-slate-700">
+                            <span>Total Gastos Extra: <span id="total-gastos-monto" class="text-teal-600 font-mono text-sm">$0.00</span></span>
+                            <span>Utilidad Real Estimada: <span id="utilidad-real-monto" class="text-indigo-600 font-mono text-sm">$0.00</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN DE REFACCIONES Y MANO DE OBRA (Taller) -->
+                <div id="section-taller-partes-container" class="pt-6 border-t border-slate-200/60 hidden space-y-4">
+                    <h4 class="text-xs font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-400"></span> Control de Refacciones y Mano de Obra
+                    </h4>
+                    
+                    <form onsubmit="agregarItemTaller(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white/60 p-4 rounded-2xl border border-blue-100">
+                        <div>
+                            <select id="taller-item-category" required class="w-full bg-white border border-slate-200 focus:border-blue-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                                <option value="" disabled selected>Tipo...</option>
+                                <option value="Refacción">Refacción / Pieza</option>
+                                <option value="Mano de Obra">Mano de Obra</option>
+                                <option value="Insumo">Insumo / Material</option>
+                                <option value="Servicio Externo">Servicio Externo</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <input type="text" id="taller-item-descripcion" required placeholder="Nombre de la refacción o servicio..." class="w-full bg-white border border-slate-200 focus:border-blue-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                        </div>
+                        <div>
+                            <input type="number" step="any" id="taller-item-monto" required placeholder="Costo ($)" class="w-full bg-white border border-slate-200 focus:border-blue-400 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
+                        </div>
+                        <div>
+                            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition-colors shadow-sm">
+                                + Agregar
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="bg-white/40 rounded-2xl p-4 border border-slate-200/60 space-y-2">
+                        <div id="lista-items-taller" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                            <p class="text-xs text-slate-400 text-center py-2">Cargando refacciones y servicios...</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-200 flex justify-end items-center text-xs font-bold text-slate-700">
+                            <span>Cuenta Total a Cobrar: <span id="total-cuenta-taller" class="text-blue-600 font-mono text-base ml-2">$0.00</span></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Zona de Peligro: Eliminar -->
+            <div class="bg-rose-50/80 border-t border-rose-100 px-8 py-5 flex justify-between items-center backdrop-blur-md">
+                <div>
+                    <h4 class="text-rose-700 font-bold text-sm">Zona de Peligro</h4>
+                    <p class="text-rose-500 text-xs font-medium">Esta acción eliminará el registro permanentemente.</p>
+                </div>
+                <button type="button" onclick="eliminarRegistro()" class="bg-white hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-200 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md">
+                    Eliminar Registro
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL 4: PRECIO FINAL DE VENTA (ESTILO DASHBOARD + ANIMACIÓN) ================= -->
+    <div id="modal-precio-vendido" class="fixed inset-0 bg-slate-800/40 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-panel !bg-white/95 rounded-[2rem] max-w-md w-full shadow-2xl flex flex-col transform scale-95 transition-transform duration-300 p-8 space-y-6 text-center" id="content-precio-vendido">
+            
+            <!-- Vista de Formulario -->
+            <div id="form-precio-vendido-container" class="space-y-4">
+                <div class="mx-auto w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl border border-emerald-100 shadow-sm mb-2">
+                    💵
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight">Vehículo Vendido</h3>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Ingresa el precio final de venta para registrar la utilidad.</p>
+                </div>
+                <div class="space-y-1 text-left pt-2">
+                    <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider pl-1">Precio Final de Venta ($)</label>
+                    <input type="number" step="any" id="input-precio-final-vendido" placeholder="Ej. 185000" class="w-full bg-white border border-slate-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/10 rounded-xl px-4 py-3 text-sm text-slate-800 font-bold outline-none transition-all shadow-sm">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="cancelarCambioVendido()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl text-xs transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="confirmarPrecioVendido()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs shadow-md shadow-emerald-500/20 transition-colors">
+                        Guardar Venta
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vista de Animación de Paloma (Éxito) -->
+            <div id="animacion-paloma-container" class="hidden flex flex-col items-center justify-center py-6 space-y-4">
+                <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl animate-scale-up shadow-lg border-2 border-emerald-300">
+                    ✓
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-emerald-600 tracking-tight">¡Venta Registrada!</h3>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Actualizando estatus y utilidades...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ================= MODAL 5: CONFIRMACIÓN Y CIERRE DE ORDEN (TALLER - ENTREGADO) ================= -->
+    <div id="modal-entregado-taller" class="fixed inset-0 bg-slate-800/40 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-panel !bg-white/95 rounded-[2rem] max-w-md w-full shadow-2xl flex flex-col transform scale-95 transition-transform duration-300 p-8 space-y-6 text-center" id="content-entregado-taller">
+            
+            <!-- Vista de Confirmación y Monto Total -->
+            <div id="form-entregado-taller-container" class="space-y-4">
+                <div class="mx-auto w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl border border-blue-100 shadow-sm mb-2">
+                    📦
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight">Cerrar Orden de Trabajo</h3>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">El estatus cambiará a <strong>Entregado</strong>. Cantidad total a cobrar:</p>
+                </div>
+                <div class="bg-blue-50/60 p-4 rounded-2xl border border-blue-100">
+                    <span id="modal-total-cobrar-taller" class="text-3xl font-black text-blue-600 font-mono">$0.00</span>
+                </div>
+                <p class="text-xs text-slate-600 font-medium">¿Confirmas que deseas cerrar esta orden de trabajo?</p>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="cancelarCambioEntregado()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl text-xs transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="confirmarEntregaTaller()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl text-xs shadow-md shadow-blue-500/20 transition-colors">
+                        Confirmar y Cerrar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vista de Animación de Éxito -->
+            <div id="animacion-paloma-taller-container" class="hidden flex flex-col items-center justify-center py-6 space-y-4">
+                <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-4xl animate-scale-up shadow-lg border-2 border-blue-300">
+                    ✓
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-blue-600 tracking-tight">¡Orden Entregada y Cerrada!</h3>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Actualizando estatus...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts de Lógica y Supabase -->
+    <script>
+        const SUPABASE_URL = 'https://ltoafnkgawzfvjemaock.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_QfGRSF_-7dR9_HwmJGnnog_F0J3zJ2S';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let registroActivoId = null;
+        let moduloActivo = null;
+        let precioTemporalGuardado = 0;
+        let estatusTallerPrevio = '';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            cargarTablas();
+
+            // Evento para abrir el modal personalizado cuando selecciona "Vendido" en ventas
+            document.getElementById('edit-estatus').addEventListener('change', function() {
+                if (this.value === 'Vendido' && moduloActivo === 'ventas') {
+                    document.getElementById('form-precio-vendido-container').classList.remove('hidden');
+                    document.getElementById('animacion-paloma-container').classList.add('hidden');
+                    document.getElementById('input-precio-final-vendido').value = '';
+                    openBaseModal('modal-precio-vendido', 'content-precio-vendido');
+                    setTimeout(() => document.getElementById('input-precio-final-vendido').focus(), 100);
+                }
+            });
+
+            // Evento para abrir el modal personalizado cuando selecciona "Entregado" en taller
+            document.getElementById('edit-estatus-taller').addEventListener('change', async function() {
+                if (this.value === 'Entregado' && moduloActivo === 'taller' && registroActivoId) {
+                    // Calcular el total de los detalles (refacciones y servicios) para mostrar en el cuadro
+                    const { data: itemsData } = await supabase.from('repair_expenses').select('*').eq('repair_order_id', registroActivoId);
+                    const totalOrden = itemsData ? itemsData.reduce((sum, exp) => sum + (Number(exp.monto) || 0), 0) : 0;
+
+                    document.getElementById('modal-total-cobrar-taller').innerText = `$${totalOrden.toLocaleString()}`;
+                    document.getElementById('form-entregado-taller-container').classList.remove('hidden');
+                    document.getElementById('animacion-paloma-taller-container').classList.add('hidden');
+                    openBaseModal('modal-entregado-taller', 'content-entregado-taller');
+                }
+            });
+        });
+
+        async function cargarTablas() {
+            await cargarRepairOrders();
+            await cargarVehicles();
+        }
+
+        async function cargarRepairOrders() {
+            const { data: repairData, error: repairError } = await supabase.from('repair_orders').select('*');
+            const { data: itemsData, error: itemsError } = await supabase.from('repair_expenses').select('*');
+            
+            const tbody = document.getElementById('tabla-taller-body');
+            tbody.innerHTML = '';
+
+            if (repairError) {
+                console.error('Error cargando taller:', repairError.message);
+                return;
+            }
+
+            let tallerActivos = 0;
+            let tallerEspera = 0;
+            let tallerTerminados = 0;
+            let ingresosTallerTotal = 0;
+
+            if (repairData && repairData.length > 0) {
+                repairData.forEach(item => {
+                    const estatus = item.estatus || 'En Reparación';
+                    const itemsOrden = itemsData ? itemsData.filter(exp => exp.repair_order_id === item.id) : [];
+                    const totalOrden = itemsOrden.reduce((sum, exp) => sum + (Number(exp.monto) || 0), 0);
+
+                    if (estatus === 'Esperando Refacciones') {
+                        tallerEspera++;
+                        tallerActivos++;
+                    } else if (estatus === 'Terminado' || estatus === 'Entregado') {
+                        tallerTerminados++;
+                        ingresosTallerTotal += totalOrden;
+                    } else {
+                        tallerActivos++;
+                    }
+                });
+            }
+
+            document.getElementById('metric-taller-count').innerText = tallerActivos;
+            document.getElementById('metric-taller-espera').innerText = tallerEspera;
+            document.getElementById('metric-taller-terminados').innerText = tallerTerminados;
+            document.getElementById('metric-taller-ingresos').innerText = `$${ingresosTallerTotal.toLocaleString()}`;
+
+            if (repairData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400 font-medium">No hay órdenes registradas todavía.</td></tr>`;
+                return;
+            }
+
+            repairData.forEach(item => {
+                const modelo = item.vehiculo_modelo ? String(item.vehiculo_modelo).replace(/'/g, "\\'") : '';
+                const cliente = item.cliente_nombre ? String(item.cliente_nombre).replace(/'/g, "\\'") : '';
+                const estatusVal = item.estatus || 'En Reparación';
+                const fallaVal = item.falla_reportada ? String(item.falla_reportada).replace(/'/g, "\\'") : '';
+
+                const itemsOrden = itemsData ? itemsData.filter(exp => exp.repair_order_id === item.id) : [];
+                const totalOrden = itemsOrden.reduce((sum, exp) => sum + (Number(exp.monto) || 0), 0);
+
+                let badgeClass = "bg-blue-50 text-blue-700 border-blue-200/60";
+                let dotClass = "bg-blue-500";
+                if (estatusVal === 'Esperando Refacciones') {
+                    badgeClass = "bg-amber-50 text-amber-700 border-amber-200/60";
+                    dotClass = "bg-amber-500";
+                } else if (estatusVal === 'Terminado') {
+                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200/60";
+                    dotClass = "bg-emerald-500";
+                } else if (estatusVal === 'Entregado') {
+                    badgeClass = "bg-slate-100 text-slate-600 border-slate-200/60";
+                    dotClass = "bg-slate-400";
+                } else if (estatusVal === 'En Revisión') {
+                    badgeClass = "bg-indigo-50 text-indigo-700 border-indigo-200/60";
+                    dotClass = "bg-indigo-500";
+                }
+                
+                tbody.innerHTML += `
+                    <tr class="glass-panel hover:bg-white/80 transition-colors group">
+                        <td class="px-6 py-4 rounded-l-2xl border-y border-l border-transparent">
+                            <div class="font-black text-slate-800 text-base">OT-${item.id || '00'}</div>
+                            <div class="text-slate-500 text-xs mt-0.5 font-medium">${item.cliente_nombre || 'Sin cliente'}</div>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent font-semibold text-slate-600">
+                            ${item.vehiculo_modelo || 'Sin especificar'}
+                            <div class="text-slate-400 text-xs font-normal mt-0.5">${item.falla_reportada || 'Sin descripción'}</div>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent">
+                            <span class="${badgeClass} px-3 py-1.5 rounded-full text-xs font-bold flex items-center w-max gap-1.5 shadow-sm border">
+                                <span class="w-1.5 h-1.5 rounded-full ${dotClass} animate-pulse"></span> ${estatusVal}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent font-mono font-bold text-blue-600 text-sm">
+                            $${totalOrden.toLocaleString()}
+                        </td>
+                        <td class="px-6 py-4 rounded-r-2xl border-y border-r border-transparent text-right">
+                            <button type="button" onclick="abrirDetalles('taller', ${item.id}, '${modelo}', '${cliente}', 0, '${estatusVal}', '${fallaVal}')" class="bg-white hover:bg-blue-50 text-blue-600 border border-blue-100 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">Ver Ficha</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function cargarVehicles() {
+            const { data: vehiclesData, error: vehiclesError } = await supabase.from('vehicles').select('*');
+            const { data: expensesData, error: expensesError } = await supabase.from('vehicle_expenses').select('*');
+            
+            const tbody = document.getElementById('tabla-ventas-body');
+            tbody.innerHTML = '';
+
+            if (vehiclesError) {
+                console.error('Error cargando vehículos:', vehiclesError.message);
+                return;
+            }
+
+            let carrosActivosCount = 0;
+            let inversionActivaTotal = 0;
+            let gastosActivosTotal = 0;
+            let ventasExitosasCount = 0;
+            let gananciasNetasTotal = 0;
+
+            if (vehiclesData && vehiclesData.length > 0) {
+                vehiclesData.forEach(item => {
+                    const estatus = item.estatus || 'Disponible';
+                    const inversion = Number(item.costo_inversion) || 0;
+                    const precio = Number(item.precio) || 0;
+
+                    const gastosVehiculo = expensesData ? expensesData.filter(exp => exp.vehicle_id === item.id) : [];
+                    const totalGastosVehiculo = gastosVehiculo.reduce((sum, exp) => sum + (Number(exp.monto) || 0), 0);
+
+                    if (estatus === 'Vendido') {
+                        ventasExitosasCount++;
+                        const gananciaAuto = precio - inversion - totalGastosVehiculo;
+                        gananciasNetasTotal += gananciaAuto;
+                    } else {
+                        carrosActivosCount++;
+                        inversionActivaTotal += inversion;
+                        gastosActivosTotal += totalGastosVehiculo;
+                    }
+                });
+            }
+
+            document.getElementById('kpi-carros-activos').innerText = carrosActivosCount;
+            document.getElementById('kpi-inversion-activa').innerText = `$${inversionActivaTotal.toLocaleString()}`;
+            document.getElementById('kpi-gastos-activos').innerText = `$${gastosActivosTotal.toLocaleString()}`;
+            document.getElementById('kpi-ventas-exitosas').innerText = ventasExitosasCount;
+            document.getElementById('kpi-ganancias-netas').innerText = `$${gananciasNetasTotal.toLocaleString()}`;
+
+            if (vehiclesData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-6 text-center text-slate-400 font-medium">No hay vehículos registrados para venta.</td></tr>`;
+                return;
+            }
+
+            vehiclesData.forEach(item => {
+                const modelo = item.vehiculo_modelo ? String(item.vehiculo_modelo).replace(/'/g, "\\'") : '';
+                const inversionVal = item.costo_inversion ? Number(item.costo_inversion) : 0;
+                const precioVal = item.precio ? Number(item.precio) : 0;
+                const estatusVal = item.estatus || 'Disponible';
+                
+                let fechaFormateada = 'Sin fecha';
+                if (item.created_at) {
+                    const fechaObj = new Date(item.created_at);
+                    fechaFormateada = fechaObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                }
+
+                let badgeClass = "bg-teal-50 text-teal-700 border-teal-200/60";
+                let dotClass = "bg-teal-500";
+                if (estatusVal === 'Vendido') {
+                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200/60";
+                    dotClass = "bg-emerald-500";
+                } else if (estatusVal === 'En Proceso') {
+                    badgeClass = "bg-amber-50 text-amber-700 border-amber-200/60";
+                    dotClass = "bg-amber-500";
+                }
+
+                tbody.innerHTML += `
+                    <tr class="glass-panel hover:bg-white/80 transition-colors group">
+                        <td class="px-6 py-4 rounded-l-2xl border-y border-l border-transparent">
+                            <div class="font-black text-slate-800 text-base">#V-${item.id || '00'}</div>
+                            <div class="text-slate-500 text-xs mt-0.5 font-medium">Inventario</div>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent font-bold text-slate-600">
+                            ${item.vehiculo_modelo || 'Sin modelo'}
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent font-mono text-xs">
+                            <div class="text-slate-400">Inv: $${inversionVal.toLocaleString()}</div>
+                            <div class="text-teal-600 font-bold text-sm">Venta: $${precioVal.toLocaleString()}</div>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent">
+                            <span class="${badgeClass} px-3 py-1.5 rounded-full text-xs font-bold flex items-center w-max gap-1.5 shadow-sm border">
+                                <span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span> ${estatusVal}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 border-y border-transparent text-slate-500 text-xs font-medium">
+                            ${fechaFormateada}
+                        </td>
+                        <td class="px-6 py-4 rounded-r-2xl border-y border-r border-transparent text-right">
+                            <button type="button" onclick="abrirDetalles('ventas', ${item.id}, '${modelo}', '', ${inversionVal}, '${estatusVal}')" class="bg-white hover:bg-teal-50 text-teal-600 border border-teal-100 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">Ver Ficha</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function guardarOrdenTaller(event) {
+            event.preventDefault();
+            const cliente = document.getElementById('input-cliente-taller').value;
+            const vehiculo = document.getElementById('input-vehiculo-taller').value;
+            const estatus = document.getElementById('input-estatus-taller').value;
+            const falla = document.getElementById('input-falla-taller').value;
+
+            const { error } = await supabase
+                .from('repair_orders')
+                .insert([{ cliente_nombre: cliente, vehiculo_modelo: vehiculo, falla_reportada: falla, estatus: estatus }]);
+
+            if (error) {
+                alert('Error al registrar la orden: ' + error.message);
+                return;
+            }
+
+            closeModal('modal-add-taller', 'content-add-taller');
+            cargarRepairOrders();
+        }
+
+        async function guardarAutoVenta(event) {
+            event.preventDefault();
+            const vehiculo = document.getElementById('input-vehiculo-venta').value;
+            const inversion = document.getElementById('input-inversion-venta').value;
+            const precio = document.getElementById('input-precio-venta').value;
+            const estatus = document.getElementById('input-estatus-venta').value;
+
+            const { error } = await supabase
+                .from('vehicles')
+                .insert([{ vehiculo_modelo: vehiculo, costo_inversion: parseFloat(inversion), precio: parseFloat(precio), estatus: estatus }]);
+
+            if (error) {
+                alert('Error al registrar el vehículo: ' + error.message);
+                return;
+            }
+
+            closeModal('modal-add-venta', 'content-add-venta');
+            cargarVehicles();
+        }
+
+        function switchTab(tabName) {
+            const viewTaller = document.getElementById('view-taller');
+            const viewVentas = document.getElementById('view-ventas');
+            const btnTaller = document.getElementById('btn-taller');
+            const btnVentas = document.getElementById('btn-ventas');
+
+            const inactiveClass = "relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 text-slate-500 hover:text-slate-800 hover:bg-white/50";
+            const activeTallerClass = "relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 bg-blue-500 text-white shadow-md shadow-blue-500/20";
+            const activeVentasClass = "relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 bg-teal-500 text-white shadow-md shadow-teal-500/20";
+
+            if (tabName === 'taller') {
+                viewTaller.classList.remove('hidden');
+                viewVentas.classList.add('hidden');
+                btnTaller.className = activeTallerClass;
+                btnVentas.className = inactiveClass;
+            } else {
+                viewTaller.classList.add('hidden');
+                viewVentas.classList.remove('hidden');
+                btnTaller.className = inactiveClass;
+                btnVentas.className = activeVentasClass;
+            }
+        }
+
+        function openBaseModal(modalId, contentId) {
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(contentId);
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal(modalId, contentId) {
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(contentId);
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); 
+        }
+
+        function openAddTaller() { openBaseModal('modal-add-taller', 'content-add-taller'); }
+        function openAddVenta() { openBaseModal('modal-add-venta', 'content-add-venta'); }
+        
+        async function abrirDetalles(contexto, id, vehiculo, cliente, inversion = 0, estatus = '', falla = '') {
+            registroActivoId = id;
+            moduloActivo = contexto;
+            estatusTallerPrevio = estatus;
+
+            document.getElementById('edit-vehiculo').value = vehiculo;
+            document.getElementById('edit-cliente').value = cliente;
+            document.getElementById('edit-inversion').value = inversion;
+            document.getElementById('edit-estatus').value = estatus;
+            document.getElementById('edit-estatus-taller').value = estatus;
+            document.getElementById('edit-falla').value = falla;
+
+            const icon = document.getElementById('modal-icon');
+            const containerCliente = document.getElementById('container-edit-cliente');
+            const containerInversion = document.getElementById('container-edit-inversion');
+            const containerEstatus = document.getElementById('container-edit-estatus');
+            const containerEstatusTaller = document.getElementById('container-edit-estatus-taller');
+            const containerFalla = document.getElementById('container-edit-falla');
+            const sectionGastos = document.getElementById('section-gastos-container');
+            const sectionTallerPartes = document.getElementById('section-taller-partes-container');
+
+            if(contexto === 'taller') {
+                icon.className = "h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl border border-blue-100 shadow-sm";
+                containerCliente.style.display = 'block';
+                containerInversion.style.display = 'none';
+                containerEstatus.style.display = 'none';
+                containerEstatusTaller.style.display = 'block';
+                containerFalla.style.display = 'block';
+                sectionGastos.classList.add('hidden');
+                sectionTallerPartes.classList.remove('hidden');
+                
+                await cargarItemsTaller(id);
+            } else {
+                icon.className = "h-10 w-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl border border-teal-100 shadow-sm";
+                containerCliente.style.display = 'none';
+                containerInversion.style.display = 'block';
+                containerEstatus.style.display = 'block';
+                containerEstatusTaller.style.display = 'none';
+                containerFalla.style.display = 'none';
+                sectionGastos.classList.remove('hidden');
+                sectionTallerPartes.classList.add('hidden');
+                
+                await cargarGastosVehiculo(id, inversion);
+            }
+            
+            openBaseModal('modal-edit', 'content-edit');
+        }
+
+        async function cargarGastosVehiculo(vehicleId, inversionInicial) {
+            const listaContainer = document.getElementById('lista-gastos-vehiculo');
+            listaContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">Cargando gastos...</p>`;
+
+            const { data: vehiculoData } = await supabase.from('vehicles').select('precio').eq('id', vehicleId).single();
+            const precioVentaActual = vehiculoData ? Number(vehiculoData.precio) || 0 : 0;
+
+            const { data, error } = await supabase
+                .from('vehicle_expenses')
+                .select('*')
+                .eq('vehicle_id', vehicleId);
+
+            if (error) {
+                console.error('Error cargando gastos:', error.message);
+                listaContainer.innerHTML = `<p class="text-xs text-rose-500 text-center py-2">Error al cargar gastos.</p>`;
+                return;
+            }
+
+            let totalGastos = 0;
+            listaContainer.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                listaContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">No hay gastos adicionales registrados para este vehículo.</p>`;
+            } else {
+                data.forEach(gasto => {
+                    const montoVal = Number(gasto.monto) || 0;
+                    totalGastos += montoVal;
+                    const catVal = gasto.category || 'Sin categoría';
+                    const descVal = gasto.descripcion ? `— ${gasto.descripcion}` : '';
+                    
+                    listaContainer.innerHTML += `
+                        <div class="flex justify-between items-center bg-white/80 px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                            <div>
+                                <span class="font-bold text-slate-700">${catVal}</span>
+                                <span class="text-slate-500 ml-1 font-medium">${descVal}</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-mono font-bold text-teal-600">$${montoVal.toLocaleString()}</span>
+                                <button type="button" onclick="eliminarGasto(${gasto.id})" class="text-rose-400 hover:text-rose-600 font-bold">✕</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('total-gastos-monto').innerText = `$${totalGastos.toLocaleString()}`;
+            
+            const inv = Number(inversionInicial) || 0;
+            const utilidadReal = precioVentaActual - inv - totalGastos;
+            const utilidadEl = document.getElementById('utilidad-real-monto');
+            utilidadEl.innerText = `$${utilidadReal.toLocaleString()}`;
+            utilidadEl.className = utilidadReal >= 0 ? "text-emerald-600 font-mono text-sm" : "text-rose-600 font-mono text-sm";
+        }
+
+        async function cargarItemsTaller(repairId) {
+            const listaContainer = document.getElementById('lista-items-taller');
+            listaContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">Cargando refacciones y mano de obra...</p>`;
+
+            const { data, error } = await supabase
+                .from('repair_expenses')
+                .select('*')
+                .eq('repair_order_id', repairId);
+
+            if (error) {
+                console.error('Error cargando refacciones/servicios:', error.message);
+                listaContainer.innerHTML = `<p class="text-xs text-rose-500 text-center py-2">Error al cargar elementos.</p>`;
+                return;
+            }
+
+            let totalCuenta = 0;
+            listaContainer.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                listaContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">No hay refacciones o servicios registrados en esta orden.</p>`;
+            } else {
+                data.forEach(item => {
+                    const montoVal = Number(item.monto) || 0;
+                    totalCuenta += montoVal;
+                    const catVal = item.category || 'Servicio';
+                    const descVal = item.descripcion ? `— ${item.descripcion}` : '';
+                    
+                    listaContainer.innerHTML += `
+                        <div class="flex justify-between items-center bg-white/80 px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                            <div>
+                                <span class="font-bold text-slate-700">${catVal}</span>
+                                <span class="text-slate-500 ml-1 font-medium">${descVal}</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-mono font-bold text-blue-600">$${montoVal.toLocaleString()}</span>
+                                <button type="button" onclick="eliminarItemTaller(${item.id})" class="text-rose-400 hover:text-rose-600 font-bold">✕</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('total-cuenta-taller').innerText = `$${totalCuenta.toLocaleString()}`;
+        }
+
+        async function agregarGasto(event) {
+            event.preventDefault();
+            if (!registroActivoId) return;
+
+            const categoryVal = document.getElementById('gasto-category').value;
+            const descripcionVal = document.getElementById('gasto-descripcion').value;
+            const monto = document.getElementById('gasto-monto').value;
+
+            const { error } = await supabase
+                .from('vehicle_expenses')
+                .insert([{ 
+                    vehicle_id: registroActivoId, 
+                    category: categoryVal, 
+                    descripcion: descripcionVal, 
+                    monto: parseFloat(monto) 
+                }]);
+
+            if (error) {
+                alert('Error al agregar gasto: ' + error.message);
+                return;
+            }
+
+            document.getElementById('gasto-category').selectedIndex = 0;
+            document.getElementById('gasto-descripcion').value = '';
+            document.getElementById('gasto-monto').value = '';
+
+            const inversion = parseFloat(document.getElementById('edit-inversion').value) || 0;
+            await cargarGastosVehiculo(registroActivoId, inversion);
+            await cargarVehicles();
+        }
+
+        async function eliminarGasto(gastoId) {
+            const { error } = await supabase
+                .from('vehicle_expenses')
+                .delete()
+                .eq('id', gastoId);
+
+            if (error) {
+                alert('Error al eliminar gasto: ' + error.message);
+                return;
+            }
+
+            const inversion = parseFloat(document.getElementById('edit-inversion').value) || 0;
+            await cargarGastosVehiculo(registroActivoId, inversion);
+            await cargarVehicles();
+        }
+
+        async function agregarItemTaller(event) {
+            event.preventDefault();
+            if (!registroActivoId) return;
+
+            const categoryVal = document.getElementById('taller-item-category').value;
+            const descripcionVal = document.getElementById('taller-item-descripcion').value;
+            const monto = document.getElementById('taller-item-monto').value;
+
+            const { error } = await supabase
+                .from('repair_expenses')
+                .insert([{ 
+                    repair_order_id: registroActivoId, 
+                    category: categoryVal, 
+                    descripcion: descripcionVal, 
+                    monto: parseFloat(monto) 
+                }]);
+
+            if (error) {
+                alert('Error al agregar elemento: ' + error.message);
+                return;
+            }
+
+            document.getElementById('taller-item-category').selectedIndex = 0;
+            document.getElementById('taller-item-descripcion').value = '';
+            document.getElementById('taller-item-monto').value = '';
+
+            await cargarItemsTaller(registroActivoId);
+            await cargarRepairOrders();
+        }
+
+        async function eliminarItemTaller(itemId) {
+            const { error } = await supabase
+                .from('repair_expenses')
+                .delete()
+                .eq('id', itemId);
+
+            if (error) {
+                alert('Error al eliminar elemento: ' + error.message);
+                return;
+            }
+
+            await cargarItemsTaller(registroActivoId);
+            await cargarRepairOrders();
+        }
+
+        async function confirmarPrecioVendido() {
+            const precioVenta = document.getElementById('input-precio-final-vendido').value;
+            if (!precioVenta) {
+                alert('Por favor ingresa un precio de venta válido.');
+                return;
+            }
+
+            precioTemporalGuardado = parseFloat(precioVenta);
+
+            document.getElementById('form-precio-vendido-container').classList.add('hidden');
+            document.getElementById('animacion-paloma-container').classList.remove('hidden');
+
+            if (registroActivoId && moduloActivo === 'ventas') {
+                await supabase
+                    .from('vehicles')
+                    .update({ estatus: 'Vendido', precio: precioTemporalGuardado })
+                    .eq('id', registroActivoId);
+            }
+
+            setTimeout(async () => {
+                closeModal('modal-precio-vendido', 'content-precio-vendido');
+                closeModal('modal-edit', 'content-edit');
+                await cargarTablas();
+                registroActivoId = null;
+                moduloActivo = null;
+            }, 1400);
+        }
+
+        function cancelarCambioVendido() {
+            closeModal('modal-precio-vendido', 'content-precio-vendido');
+            document.getElementById('edit-estatus').value = 'Disponible';
+        }
+
+        async function confirmarEntregaTaller() {
+            document.getElementById('form-entregado-taller-container').classList.add('hidden');
+            document.getElementById('animacion-paloma-taller-container').classList.remove('hidden');
+
+            if (registroActivoId && moduloActivo === 'taller') {
+                const { error } = await supabase
+                    .from('repair_orders')
+                    .update({ estatus: 'Entregado' })
+                    .eq('id', registroActivoId);
+
+                if (error) {
+                    alert('Error al actualizar estatus: ' + error.message);
+                    return;
+                }
+            }
+
+            setTimeout(async () => {
+                closeModal('modal-entregado-taller', 'content-entregado-taller');
+                closeModal('modal-edit', 'content-edit');
+                await cargarTablas();
+                registroActivoId = null;
+                moduloActivo = null;
+            }, 1400);
+        }
+
+        function cancelarCambioEntregado() {
+            closeModal('modal-entregado-taller', 'content-entregado-taller');
+            document.getElementById('edit-estatus-taller').value = estatusTallerPrevio || 'Terminado';
+        }
+
+        async function actualizarRegistro() {
+            if (!registroActivoId || !moduloActivo) return;
+
+            const vehiculo = document.getElementById('edit-vehiculo').value;
+            const tabla = moduloActivo === 'taller' ? 'repair_orders' : 'vehicles';
+
+            let updateData = {};
+            if (moduloActivo === 'taller') {
+                const cliente = document.getElementById('edit-cliente').value;
+                const estatusTaller = document.getElementById('edit-estatus-taller').value;
+                const falla = document.getElementById('edit-falla').value;
+                updateData = { vehiculo_modelo: vehiculo, cliente_nombre: cliente, estatus: estatusTaller, falla_reportada: falla };
+            } else {
+                const inversion = document.getElementById('edit-inversion').value;
+                const estatus = document.getElementById('edit-estatus').value;
+                updateData = { vehiculo_modelo: vehiculo, costo_inversion: parseFloat(inversion), estatus: estatus };
+            }
+
+            const { error } = await supabase
+                .from(tabla)
+                .update(updateData)
+                .eq('id', registroActivoId);
+
+            if (error) {
+                alert('Error al actualizar: ' + error.message);
+                return;
+            }
+
+            closeModal('modal-edit', 'content-edit');
+            cargarTablas();
+            registroActivoId = null;
+            moduloActivo = null;
+        }
+
+        async function eliminarRegistro() {
+            if (!registroActivoId || !moduloActivo) return;
+
+            const confirmacion = confirm("¿Estás seguro de que deseas eliminar este registro permanentemente?");
+            if (!confirmacion) return;
+
+            const tabla = moduloActivo === 'taller' ? 'repair_orders' : 'vehicles';
+
+            const { error } = await supabase
+                .from(tabla)
+                .delete()
+                .eq('id', registroActivoId);
+
+            if (error) {
+                alert('Error al eliminar el registro: ' + error.message);
+                return;
+            }
+
+            closeModal('modal-edit', 'content-edit');
+            cargarTablas();
+            registroActivoId = null;
+            moduloActivo = null;
+        }
+    </script>
+</body>
+</html>
