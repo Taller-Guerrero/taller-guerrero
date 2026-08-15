@@ -893,8 +893,8 @@
                         <input type="text" id="taller-item-descripcion" required placeholder="Descripción..." style="width: 100%; margin:0;">
                     </div>
                     <div>
-                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Surtió</label>
-                        <input type="text" id="taller-item-comprador" required placeholder="Persona..." style="width: 100%; margin:0;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Surtió (Ej. Diego, Papá)</label>
+                        <input type="text" id="taller-item-comprador" required placeholder="Nombre de quien compró..." style="width: 100%; margin:0;">
                     </div>
                     <div id="container-taller-precio-real" style="margin:0;">
                         <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Costo Taller ($)</label>
@@ -908,7 +908,12 @@
                          <button type="submit" style="margin:0;"><i class="ph ph-plus"></i> Añadir a la Cuenta</button>
                     </div>
                 </form>
-                <div id="lista-items-taller" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;"></div>
+                
+                <div id="lista-items-taller" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
+                
+                <!-- PANEL DE INVERSORES EN TIEMPO REAL -->
+                <div id="panel-desglose-inversores" style="margin-bottom: 15px;"></div>
+                
                 <div style="background: var(--primary-light); padding: 15px; border-radius: var(--radius-md); border: 1px solid rgba(37, 99, 235, 0.2); display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-muted);">Total a Cobrar: <strong id="total-cuenta-taller" style="color: var(--primary); font-size: 1.3rem;">$0.00</strong></span>
                     <button type="button" onclick="abrirModalPago()" class="btn-success"><i class="ph ph-currency-circle-dollar"></i> Cobrar y Entregar</button>
@@ -931,10 +936,16 @@
                 <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
                     <div id="ticket-items-container" style="max-height: 220px; overflow-y: auto; margin-bottom: 12px; padding-right: 5px;"></div>
                     <hr style="border: none; border-top: 2px dashed var(--border-color); margin: 12px 0;">
+                    
                     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px; color: var(--text-muted);">
                         <span>Costo Total Invertido (Taller):</span>
                         <strong id="ticket-costo-taller" style="color: #ef4444;">$0.00</strong>
                     </div>
+                    
+                    <!-- RECUADRO DESGLOSE DE DEUDAS/DEVOLUCIONES -->
+                    <div id="ticket-desglose-inversores" style="background: #fff; padding: 12px; border-radius: 8px; margin: 10px 0 15px 0; border: 1px solid var(--border-color); font-size: 0.9rem;">
+                    </div>
+                    
                     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 12px; color: var(--text-muted);">
                         <span>Ganancia Neta Taller:</span>
                         <strong id="ticket-ganancia-taller" style="color: #16a34a;">$0.00</strong>
@@ -948,6 +959,28 @@
                 <div style="text-align: right;">
                     <button type="button" onclick="closeModal('modal-pago')" class="btn-cancel" style="margin-right: 10px;">Regresar</button>
                     <button type="button" onclick="confirmarEntregaYPago()" class="btn-success"><i class="ph ph-check-circle"></i> Confirmar Pago y Marcar Entregado</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para confirmar el precio real de Venta -->
+    <div id="modal-venta-confirmacion" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3><i class="ph ph-handshake"></i> Confirmar Venta</h3>
+                <button type="button" onclick="closeModal('modal-venta-confirmacion')" class="btn-cancel"><i class="ph ph-x"></i></button>
+            </div>
+            <div style="padding: 10px 0;">
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 0.95rem;">
+                    Ingresa el precio final al que se vendió realmente el vehículo para calcular tu utilidad neta con exactitud.
+                </p>
+                <label>Precio Real de Venta ($)</label>
+                <input type="number" step="any" id="input-precio-final" required placeholder="Ej. 120000" style="margin-bottom: 25px;">
+                
+                <div style="text-align: right;">
+                    <button type="button" onclick="closeModal('modal-venta-confirmacion')" class="btn-cancel" style="margin-right: 10px;">Cancelar</button>
+                    <button type="button" onclick="procesarVentaFinal()" class="btn-success"><i class="ph ph-check"></i> Cerrar Venta</button>
                 </div>
             </div>
         </div>
@@ -1043,6 +1076,7 @@
             let totalVenta = 0;
             let costoTotalTaller = 0;
             let ticketHtml = '';
+            let desgloseInversores = {}; // Para agrupar quién puso qué
 
             if (itemsOrdenActual.length > 0) {
                 itemsOrdenActual.forEach(i => {
@@ -1050,6 +1084,12 @@
                     const precioReal = Number(i.precio_real || 0);
                     totalVenta += precioVenta;
                     costoTotalTaller += precioReal;
+
+                    // Agrupar los gastos por el nombre de quien surtió/compró
+                    if (precioReal > 0) {
+                        const persona = (i.comprador && i.comprador.trim() !== '') ? i.comprador.trim() : 'Taller / Caja';
+                        desgloseInversores[persona] = (desgloseInversores[persona] || 0) + precioReal;
+                    }
 
                     ticketHtml += `
                         <div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
@@ -1069,8 +1109,22 @@
 
             const gananciaTaller = totalVenta - costoTotalTaller;
 
+            // Generar el HTML del Desglose de devoluciones
+            let desgloseHtml = '<strong style="display:block; margin-bottom: 10px; color: var(--text-main);"><i class="ph ph-users"></i> Desglose de Devolución (Quién puso qué):</strong>';
+            if (Object.keys(desgloseInversores).length > 0) {
+                for (const [persona, monto] of Object.entries(desgloseInversores)) {
+                    desgloseHtml += `<div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-muted); border-bottom: 1px dotted var(--border-color); padding-bottom: 4px;">
+                        <span>Se le debe a <strong>${persona}</strong>:</span>
+                        <strong style="color: var(--accent-orange);">$${monto.toLocaleString()}</strong>
+                    </div>`;
+                }
+            } else {
+                desgloseHtml += `<div style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">Sin inversiones registradas en refacciones.</div>`;
+            }
+
             document.getElementById('ticket-items-container').innerHTML = ticketHtml;
             document.getElementById('ticket-costo-taller').innerText = `$${costoTotalTaller.toLocaleString()}`;
+            document.getElementById('ticket-desglose-inversores').innerHTML = desgloseHtml;
             document.getElementById('ticket-ganancia-taller').innerText = `$${gananciaTaller.toLocaleString()}`;
             document.getElementById('ticket-total-cobrar').innerText = `$${totalVenta.toLocaleString()}`;
 
@@ -1261,9 +1315,19 @@
         async function cargarItemsTaller(repairId) {
             const { data } = await supabase.from('repair_expenses').select('*').eq('repair_order_id', repairId);
             let html = '', total = 0;
+            let desgloseInversores = {};
+
             if (data) data.forEach(i => {
                 const precio = Number(i.precio_venta || i.monto); 
+                const precioReal = Number(i.precio_real || 0); 
                 total += precio;
+                
+                // Agrupar inversiones
+                if (precioReal > 0) {
+                    const persona = (i.comprador && i.comprador.trim() !== '') ? i.comprador.trim() : 'Taller / Caja';
+                    desgloseInversores[persona] = (desgloseInversores[persona] || 0) + precioReal;
+                }
+
                 html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
                     <div>
                         <span><i class="ph ph-nut"></i> <strong>${i.category}</strong>: ${i.descripcion}</span>
@@ -1274,6 +1338,18 @@
             });
             document.getElementById('lista-items-taller').innerHTML = html || '<div style="color: var(--text-muted); text-align: center; padding: 15px;">No hay cargos en esta cuenta.</div>';
             document.getElementById('total-cuenta-taller').innerText = `$${total.toLocaleString()}`;
+
+            // Actualizar el panel de inversores visual
+            let desgloseHtml = '';
+            if (Object.keys(desgloseInversores).length > 0) {
+                desgloseHtml += '<div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 700;">Inversión Actual por Persona:</div>';
+                for (const [persona, monto] of Object.entries(desgloseInversores)) {
+                    desgloseHtml += `<span style="display:inline-block; background: #e2e8f0; color: var(--text-main); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; margin-right: 8px; margin-top: 5px;">
+                        <strong>${persona}:</strong> $${monto.toLocaleString()}
+                    </span>`;
+                }
+            }
+            document.getElementById('panel-desglose-inversores').innerHTML = desgloseHtml;
         }
 
         async function agregarItemTaller(e) {
@@ -1302,12 +1378,59 @@
         }
 
         async function actualizarRegistro() {
-            let updateData = {};
-            if (moduloActivo === 'taller') updateData = { vehiculo_modelo: document.getElementById('edit-vehiculo').value, cliente_nombre: document.getElementById('edit-cliente').value, estatus: document.getElementById('edit-estatus-taller').value, falla_reportada: document.getElementById('edit-falla').value };
-            else updateData = { vehiculo_modelo: document.getElementById('edit-vehiculo').value, costo_inversion: parseFloat(document.getElementById('edit-inversion').value), estatus: document.getElementById('edit-estatus').value };
+            if (moduloActivo === 'taller') {
+                let updateData = { 
+                    vehiculo_modelo: document.getElementById('edit-vehiculo').value, 
+                    cliente_nombre: document.getElementById('edit-cliente').value, 
+                    estatus: document.getElementById('edit-estatus-taller').value, 
+                    falla_reportada: document.getElementById('edit-falla').value 
+                };
+                await supabase.from('repair_orders').update(updateData).eq('id', registroActivoId);
+                closeModal('modal-edit'); 
+                cargarTablas();
+            } else {
+                let estatusVenta = document.getElementById('edit-estatus').value;
+                
+                // Si el estatus es vendido, detenemos el guardado y abrimos el modal
+                if (estatusVenta === 'Vendido') {
+                    document.getElementById('input-precio-final').value = ""; // Limpiar input
+                    openBaseModal('modal-venta-confirmacion');
+                } else {
+                    let updateData = { 
+                        vehiculo_modelo: document.getElementById('edit-vehiculo').value, 
+                        costo_inversion: parseFloat(document.getElementById('edit-inversion').value), 
+                        estatus: estatusVenta 
+                    };
+                    await supabase.from('vehicles').update(updateData).eq('id', registroActivoId);
+                    closeModal('modal-edit'); 
+                    cargarTablas();
+                }
+            }
+        }
+
+        async function procesarVentaFinal() {
+            const precioFinal = parseFloat(document.getElementById('input-precio-final').value);
             
-            await supabase.from(moduloActivo === 'taller' ? 'repair_orders' : 'vehicles').update(updateData).eq('id', registroActivoId);
-            closeModal('modal-edit'); cargarTablas();
+            // Validar que se haya ingresado un precio válido
+            if (isNaN(precioFinal) || precioFinal <= 0) {
+                alert("Por favor ingresa un precio de venta válido.");
+                return;
+            }
+
+            // Actualizamos la base de datos incluyendo el nuevo 'precio'
+            let updateData = { 
+                vehiculo_modelo: document.getElementById('edit-vehiculo').value, 
+                costo_inversion: parseFloat(document.getElementById('edit-inversion').value), 
+                estatus: 'Vendido',
+                precio: precioFinal 
+            };
+
+            await supabase.from('vehicles').update(updateData).eq('id', registroActivoId);
+            
+            // Cerramos ambos modales y actualizamos las tablas
+            closeModal('modal-venta-confirmacion');
+            closeModal('modal-edit'); 
+            cargarTablas();
         }
 
         async function eliminarRegistro() {
